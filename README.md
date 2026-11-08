@@ -8,8 +8,7 @@ Open a terminal in this folder, then:
     javac *.java
     java SubsplitServer
 
-Open http://localhost:8080 in your browser. Data lives in memory and resets when you stop the program.
-Run it from this folder, because the server reads `index.html` from the current directory.
+Open http://localhost:8080 in your browser.
 
 ## Files
 - User, Group, Membership, Payment: the data shapes (Java records)
