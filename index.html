@@ -177,7 +177,7 @@
             <h3>Add someone to a subscription</h3>
             <form onsubmit="addMember(event)">
                 <select name="groupId" id="memberGroup" class="mine" onchange="syncForms()" required></select>
-                <input name="email" type="email" placeholder="Their email (they must have signed up)" required>
+                <input name="who"  placeholder="Their name or email (they must have signed up)" required>
                 <input name="share" id="shareInput" type="number" step="0.01" min="0" placeholder="Their share">
                 <button>Add</button>
             </form>

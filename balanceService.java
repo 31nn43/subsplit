@@ -30,12 +30,11 @@ public class balanceService {
     }
 
     // Only the owner can add people. They're added by email, and must have signed up already.
-    public Membership addMember(User me, long groupId, String email, BigDecimal share) {
+    public Membership addMember(User me, long groupId, String who, BigDecimal share) {
         Group group = findGroup(groupId);
         requireOwner(me, group);
         requireActive(group);
-        User person = store.findUserByEmail(email)
-                .orElseThrow(() -> new NotFound("No registered user with that email. Ask them to sign up first."));
+        User person = findPerson(who);
         if (store.findMembership(groupId, person.id()).isPresent())
             throw new IllegalArgumentException("That person is already in this subscription");
 
@@ -142,6 +141,21 @@ public class balanceService {
     }
 
     // ---------- small helpers ----------
+
+    // "who" is an email (if it contains @) or a name. A name must match exactly one person.
+    private User findPerson(String who) {
+        String key = who.trim();
+        if (key.contains("@")) {
+            return store.findUserByEmail(key)
+                    .orElseThrow(() -> new NotFound("No registered user with that email. Ask them to sign up first."));
+        }
+        List<User> matches = store.findUsersByName(key);
+        if (matches.isEmpty())
+            throw new NotFound("No registered user called \"" + key + "\". Ask them to sign up first.");
+        if (matches.size() > 1)
+            throw new IllegalArgumentException("More than one person is called \"" + key + "\". Use their email instead.");
+        return matches.get(0);
+    }
 
     private Group findGroup(long id) {
         return store.findGroup(id).orElseThrow(() -> new NotFound("Subscription not found: " + id));

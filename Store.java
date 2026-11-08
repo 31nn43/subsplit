@@ -37,6 +37,12 @@ public class Store {
         return users.stream().filter(u -> u.email().equalsIgnoreCase(email.trim())).findFirst();
     }
 
+    // everyone with this name (case-insensitive); more than one person can share a name
+    public synchronized List<User> findUsersByName(String name) {
+        return users.stream().filter(u -> u.name().equalsIgnoreCase(name.trim())).toList();
+    }
+
+
     public synchronized Optional<Group> findGroup(long id) {
         return groups.stream().filter(g -> g.id() == id).findFirst();
     }

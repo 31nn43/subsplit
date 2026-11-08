@@ -105,7 +105,7 @@ public class subsplitServer {
 
             if (action.equals("members") && post) {
                 BigDecimal share = f.getOrDefault("share", "").isBlank() ? null : new BigDecimal(f.get("share").trim());
-                service.addMember(me, groupId, need(f, "email"), share);
+                service.addMember(me, groupId, need(f, "who"), share);
                 return "{\"ok\":true}";
             }
             if (action.equals("payments") && post) {
