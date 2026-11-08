@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Subsplit</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+          --peach: #FF8A5B;
+          --peach-light: #FFF3EA;
+          --peach-mid: #FFD9C2;
+          --brown: #3B1F14;
+          --muted: #8a6a5c;
+          --accent: #D9552B;
+          --accent-dark: #B8431D;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: system-ui, sans-serif; color: var(--brown); background: var(--peach-light); }
+        .hidden { display: none; }
+
+        /* ---------- header ---------- */
+        header { background: var(--peach); display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1.4rem; }
+        .brand { display: flex; align-items: center; gap: 0.6rem; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.5px; }
+        .logo { width: 38px; height: 38px; }
+        .menu-wrap { position: relative; }
+        #menuBtn { background: transparent; color: var(--brown); border: 2px solid var(--brown); font-size: 1.1rem; padding: 0.3rem 0.7rem; border-radius: 10px; cursor: pointer; }
+        .menu { position: absolute; right: 0; top: 115%; background: #fff; border: 1px solid var(--peach-mid); border-radius: 12px; box-shadow: 0 8px 24px rgba(59,31,20,.18); min-width: 230px; padding: 0.4rem; z-index: 10; }
+        .menu button { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0.55rem 0.7rem; border-radius: 8px; font-size: 0.95rem; color: var(--brown); cursor: pointer; }
+        .menu button:hover:not(:disabled) { background: var(--peach-light); }
+        .menu button:disabled { color: #a38b80; cursor: default; }
+        .menu hr { border: none; border-top: 1px solid var(--peach-mid); margin: 0.3rem 0; }
+
+        main { max-width: 860px; margin: 0 auto; padding: 1.2rem 1rem 3rem; }
+        #error { color: #a11a1a; min-height: 1.2rem; font-weight: 600; }
+        .legend { color: var(--muted); font-size: 0.85rem; margin: 0.2rem 0 1rem; }
+
+        /* ---------- login / sign up ---------- */
+        .auth-box { max-width: 420px; margin: 2rem auto; background: #fff; border: 1px solid var(--peach-mid); border-radius: 16px; padding: 1.2rem 1.4rem; }
+        .auth-box h2 { margin: 0 0 0.6rem; }
+        .auth-box input { flex: 1 1 100%; }
+        .auth-box a { color: var(--accent); font-weight: 600; cursor: pointer; }
+
+        /* ---------- one row per person ---------- */
+        .person { display: flex; gap: 0.9rem; align-items: flex-start; margin: 1.2rem 0; }
+        .avatar { flex: 0 0 52px; height: 52px; margin-top: 1.75rem; border-radius: 50%; display: grid; place-items: center;
+                  font-weight: 800; font-size: 1.3rem; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(59,31,20,.18); }
+        .right { flex: 1; min-width: 0; }
+        .name { font-weight: 700; margin-bottom: 0.35rem; }
+        .total { color: var(--muted); font-weight: 500; font-size: 0.9rem; margin-left: 0.4rem; }
+
+        /* the split line: one segment per subscription, width proportional to the person's share */
+        .bar { display: flex; gap: 4px; height: 52px; }
+        .bar.empty { align-items: center; justify-content: center; border: 2px dashed var(--peach-mid); border-radius: 12px; color: var(--muted); font-size: 0.9rem; }
+        .seg { min-width: 64px; border: none; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+               gap: 0.3rem; padding: 0 0.7rem; color: var(--brown); font: inherit; text-align: left; overflow: hidden; transition: transform .12s, filter .12s; }
+        .seg:hover { filter: brightness(1.06); transform: translateY(-2px); }
+        .seg .t { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+        .seg .s { font-weight: 700; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .seg .a { font-size: 0.8rem; }
+        .seg .mark { font-weight: 800; font-size: 1.05rem; }
+        /* solid = paid, striped = still to pay, red outline = overdue */
+        .seg.PENDING, .seg.OVERDUE { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.38) 0 8px, transparent 8px 16px); }
+        .seg.OVERDUE { box-shadow: inset 0 0 0 3px #B3261E; }
+        .seg.sel { outline: 3px solid var(--brown); outline-offset: 2px; }
+
+        /* the bigger portion that opens when you click a segment */
+        .detail { margin-top: 0.8rem; background: #fff; border: 2px solid var(--peach); border-radius: 16px; padding: 0.9rem 1.1rem; animation: pop .18s ease-out; }
+        @keyframes pop { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+        .d-head { display: flex; align-items: center; gap: 0.6rem; }
+        .d-head h3 { margin: 0; font-size: 1.25rem; flex: 1; }
+        .x { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--brown); line-height: 1; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.7rem; margin: 0.9rem 0; }
+        .grid span { display: block; color: var(--muted); font-size: 0.8rem; }
+        .grid b { font-size: 1.05rem; }
+        .progress { height: 10px; background: var(--peach-light); border-radius: 999px; overflow: hidden; }
+        .progress div { height: 100%; background: var(--accent); }
+        .others { margin-top: 0.8rem; font-size: 0.9rem; color: var(--muted); }
+        .warn { margin-top: 0.7rem; padding: 0.45rem 0.7rem; background: #fff2cc; color: #8a6200; border-radius: 8px; font-size: 0.88rem; }
+        .payBtn { margin-top: 0.9rem; padding: 0.5rem 1rem; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+        .payBtn:hover { background: var(--accent-dark); }
+
+        .badge { padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700; margin-left: 0.2rem; }
+        .PAID.badge { background: #d7f5dd; color: #1b6b2e; }
+        .PENDING.badge { background: #fff2cc; color: #8a6200; }
+        .OVERDUE.badge { background: #fcd9d9; color: #a11a1a; }
+
+        /* ---------- manage popup ---------- */
+        .modal { position: fixed; inset: 0; background: rgba(59,31,20,.45); display: flex; align-items: flex-start; justify-content: center; padding: 4rem 1rem 1rem; overflow-y: auto; z-index: 20; }
+        .modal.hidden { display: none; }
+        .modal-box { background: #fff; border-radius: 16px; padding: 1rem 1.3rem 1.2rem; width: 100%; max-width: 620px; box-shadow: 0 12px 40px rgba(59,31,20,.3); animation: pop .18s ease-out; }
+        .modal-head { display: flex; align-items: center; }
+        .modal-head h2 { margin: 0; font-size: 1.2rem; flex: 1; }
+        .modal h3 { margin: 1.1rem 0 0.2rem; font-size: 1rem; }
+        form { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.4rem 0; }
+        input, select { padding: 0.45rem 0.6rem; font-size: 0.95rem; border: 1px solid #d9b9a6; border-radius: 8px; background: #fff; color: var(--brown); }
+        form button { padding: 0.45rem 0.9rem; font-size: 0.95rem; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+        form button:hover { background: var(--accent-dark); }
+        form button.danger { background: #B3261E; }
+        .meta { color: var(--muted); font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <svg class="logo" viewBox="0 0 40 40" aria-hidden="true">
+            <path d="M18 2 A18 18 0 0 0 18 38 Z" fill="#FFF3EA"/>
+            <path d="M22 2 A18 18 0 0 1 22 38 Z" fill="#3B1F14"/>
+        </svg>
+        <span>Subsplit</span>
+    </div>
+    <div class="menu-wrap hidden" id="menuWrap">
+        <button id="menuBtn" onclick="toggleMenu(event)" aria-label="Menu">☰</button>
+        <div id="menu" class="menu hidden">
+            <button disabled id="who"></button>
+            <hr>
+            <button onclick="openManage()">Manage subscriptions</button>
+            <button disabled>Settings (coming soon)</button>
+            <button disabled>History (coming soon)</button>
+            <hr>
+            <button onclick="logout()">Log out</button>
+        </div>
+    </div>
+</header>
+
+<main>
+    <div id="error"></div>
+
+    <!-- shown when logged out -->
+    <div id="auth" class="hidden">
+        <div class="auth-box">
+            <h2 id="authTitle">Log in</h2>
+            <form id="loginForm" onsubmit="submitAuth(event, 'login')">
+                <input name="email" type="email" placeholder="Email" required>
+                <input name="password" type="password" placeholder="Password" required>
+                <button>Log in</button>
+            </form>
+            <form id="signupForm" class="hidden" onsubmit="submitAuth(event, 'signup')">
+                <input name="name" placeholder="Your name" required>
+                <input name="email" type="email" placeholder="Email" required>
+                <input name="password" type="password" minlength="6" placeholder="Password (6+ characters)" required>
+                <button>Create account</button>
+            </form>
+            <p class="meta"><a id="authSwitch" onclick="toggleAuth()">New here? Create an account</a></p>
+        </div>
+    </div>
+
+    <!-- shown when logged in -->
+    <div id="app" class="hidden">
+        <div class="legend">Each bar is one person's monthly split. Wider = bigger share. Solid = paid · striped = still to pay · red outline = overdue. Click a piece for details.</div>
+        <div id="people"></div>
+    </div>
+
+    <div id="manage" class="modal hidden" onclick="if (event.target === this) closeManage()">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Manage subscriptions</h2>
+                <button class="x" onclick="closeManage()" aria-label="Close">×</button>
+            </div>
+
+            <h3>New shared subscription</h3>
+            <form onsubmit="addGroup(event)">
+                <input name="serviceName" placeholder="Service (e.g. Crunchyroll)" required>
+                <input name="totalCost" type="number" step="0.01" min="0.01" placeholder="Total cost / month" required>
+                <label class="meta">Started on <input name="startDate" type="date" required></label>
+                <label class="meta">Split
+                    <select name="split">
+                        <option value="EVEN">Even split</option>
+                        <option value="CUSTOM">Custom split</option>
+                    </select>
+                </label>
+                <button>Create</button>
+            </form>
+            <div class="meta">It renews automatically every month on that day until you cancel it. You're the owner of subscriptions you create.</div>
+
+            <h3>Add someone to a subscription</h3>
+            <form onsubmit="addMember(event)">
+                <select name="groupId" id="memberGroup" class="mine" onchange="syncForms()" required></select>
+                <input name="email" type="email" placeholder="Their email (they must have signed up)" required>
+                <input name="share" id="shareInput" type="number" step="0.01" min="0" placeholder="Their share">
+                <button>Add</button>
+            </form>
+            <div class="meta" id="shareNote"></div>
+
+            <h3>Record a payment</h3>
+            <form onsubmit="addPayment(event)">
+                <select name="groupId" id="payGroup" class="all" onchange="syncForms()" required></select>
+                <select name="userId" id="payer" class="hidden" disabled></select>
+                <input name="amount" type="number" step="0.01" min="0.01" placeholder="Amount paid" required>
+                <button>Record</button>
+            </form>
+            <div class="meta">You record your own payments. Owners can also record one for someone else.</div>
+
+            <h3>Cancel a subscription</h3>
+            <form onsubmit="cancelGroup(event)">
+                <select name="groupId" class="mine" required></select>
+                <button class="danger">Stop renewing</button>
+            </form>
+            <div class="meta">It keeps running until the end of the current month's cycle, then stops.</div>
+        </div>
+    </div>
+</main>
+
+<script>
+    // ---------- talking to the server ----------
+    async function api(path, formData) {
+      const options = formData ? { method: 'POST', body: new URLSearchParams(formData) } : {};
+      const res = await fetch('/api/' + path, options);
+      const data = await res.json();
+      if (!res.ok) { const err = new Error(data.error || 'Request failed'); err.status = res.status; throw err; }
+      return data;
+    }
+    function show(err) { document.getElementById('error').textContent = err ? err.message : ''; }
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    const setHidden = (id, hidden) => document.getElementById(id).classList.toggle('hidden', hidden);
+
+    // ---------- logging in and out ----------
+    let me = null;   // the logged-in person: { id, name, email }
+
+    async function boot() {
+      try { me = await api('me'); }
+      catch (err) {
+        if (err.status === 401) { me = null; showAuth(); return; }
+        throw err;
+      }
+      setHidden('auth', true); setHidden('app', false); setHidden('menuWrap', false);
+      document.getElementById('who').textContent = 'Signed in as ' + me.name;
+      await load();
+      if (!cache.groups.some(g => !g.ended)) openManage();   // nothing yet: start by creating a subscription
+    }
+
+    function showAuth() {
+      setHidden('auth', false); setHidden('app', true); setHidden('menuWrap', true);
+      closeManage();
+    }
+
+    let signingUp = false;
+    function toggleAuth() {
+      signingUp = !signingUp;
+      setHidden('loginForm', signingUp); setHidden('signupForm', !signingUp);
+      document.getElementById('authTitle').textContent = signingUp ? 'Create an account' : 'Log in';
+      document.getElementById('authSwitch').textContent = signingUp ? 'Already have an account? Log in' : 'New here? Create an account';
+    }
+
+    async function submitAuth(e, path) {
+      e.preventDefault();
+      try {
+        await api(path, new FormData(e.target));
+        e.target.reset(); show(null);
+        await boot();
+      } catch (err) { show(err); }
+    }
+
+    async function logout() {
+      try { await api('logout', new URLSearchParams()); } catch (err) { /* already logged out */ }
+      me = null; cache = null; selected = null; show(null);
+      showAuth();
+    }
+
+    // ---------- forms: send, then redraw ----------
+    // pathFor decides the URL from the form's values (the subscription is picked from a dropdown)
+    async function submitTo(e, pathFor) {
+      e.preventDefault();
+      try {
+        const form = e.target;
+        await api(pathFor(new FormData(form)), new FormData(form));
+        form.reset();
+        show(null);
+        await load();
+      } catch (err) { show(err); }
+    }
+    const addGroup   = e => submitTo(e, () => 'groups');
+    const addMember  = e => submitTo(e, fd => `groups/${fd.get('groupId')}/members`);
+    const addPayment = e => submitTo(e, fd => `groups/${fd.get('groupId')}/payments`);
+    async function cancelGroup(e) {
+      e.preventDefault();
+      if (!confirm('Stop this subscription renewing? This can\'t be undone.')) return;
+      return submitTo(e, fd => `groups/${fd.get('groupId')}/cancel`);
+    }
+
+    // quick "I've paid" button on your own piece
+    async function payNow(groupId, amount) {
+      try { await api(`groups/${groupId}/payments`, new URLSearchParams({ amount })); show(null); await load(); }
+      catch (err) { show(err); }
+    }
+
+    // ---------- menu + manage popup ----------
+    function toggleMenu(e) { e.stopPropagation(); document.getElementById('menu').classList.toggle('hidden'); }
+    document.addEventListener('click', () => document.getElementById('menu').classList.add('hidden'));
+    function openManage() { document.getElementById('manage').classList.remove('hidden'); }
+    function closeManage() { document.getElementById('manage').classList.add('hidden'); }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeManage(); });
+
+    // ---------- drawing ----------
+    const PALETTE = ['#FF8A5B', '#FFB86B', '#E5634D', '#F4D58D', '#E58F8F', '#8FBF9F', '#C9A27E', '#F29E6F'];
+    const MARK = { PAID: '✓', PENDING: '', OVERDUE: '!' };
+    let cache = null;      // last data fetched from the server
+    let selected = null;   // which segment is open, as "userId:groupId"
+
+    function hue(name) { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+    const money = n => '€' + Number(n).toFixed(2);
+
+    async function load() {
+      const users = await api('users');
+      const groups = await api('groups');
+      const lists = await Promise.all(groups.map(g => g.ended ? [] : api(`groups/${g.id}/balances`)));
+      cache = { users, groups, lists };
+
+      // fill the dropdowns: "mine" = subscriptions I own, "all" = every running subscription I'm in
+      const active = groups.filter(g => !g.ended);
+      const opt = g => `<option value="${g.id}">${esc(g.serviceName)}</option>`;
+      document.querySelectorAll('select.mine').forEach(s => s.innerHTML = active.filter(g => g.ownerId === me.id).map(opt).join(''));
+      document.querySelectorAll('select.all').forEach(s => s.innerHTML = active.map(opt).join(''));
+      syncForms();
+      draw();
+    }
+
+    // show/hide parts of the manage forms depending on the chosen subscription
+    function syncForms() {
+      if (!cache) return;
+      const find = id => cache.groups.find(g => String(g.id) === String(id));
+
+      // the share box only matters for custom splits
+      const mg = find(document.getElementById('memberGroup').value);
+      const custom = !!mg && mg.split === 'CUSTOM';
+      const share = document.getElementById('shareInput');
+      share.classList.toggle('hidden', !custom);
+      share.required = custom;
+      document.getElementById('shareNote').textContent = mg && !custom ? 'Even split: everyone\'s share is worked out automatically.' : '';
+
+      // only the owner gets a "paid by" dropdown (to record a payment for someone else)
+      const pg = find(document.getElementById('payGroup').value);
+      const owner = !!pg && pg.ownerId === me.id;
+      const payer = document.getElementById('payer');
+      payer.classList.toggle('hidden', !owner);
+      payer.disabled = !owner;
+      if (owner) {
+        payer.innerHTML = cache.lists[cache.groups.indexOf(pg)]
+          .map(b => `<option value="${b.userId}" ${b.userId === me.id ? 'selected' : ''}>${esc(b.userName)}${b.userId === me.id ? ' (me)' : ''}</option>`).join('');
+      }
+    }
+
+    function pick(userId, groupId) {
+      const key = userId + ':' + groupId;
+      selected = selected === key ? null : key;
+      draw();
+    }
+
+    function draw() {
+      const { users, groups, lists } = cache;
+      const people = [...users].sort((a, b) => (b.id === me.id) - (a.id === me.id));   // me first
+      let html = groups.some(g => !g.ended) ? '' :
+        '<p class="meta">No subscriptions yet. Open the ☰ menu and choose "Manage subscriptions" to create one.</p>';
+
+      for (const u of people) {
+        // every running subscription this person is part of
+        const mine = [];
+        groups.forEach((g, i) => {
+          if (g.ended) return;
+          const b = lists[i].find(x => x.userId === u.id);
+          if (b) mine.push({ g, b, i });
+        });
+        const total = mine.reduce((sum, m) => sum + m.b.share, 0);
+
+        const segs = mine.map(({ g, b, i }) => `
+          <button class="seg ${b.status} ${selected === u.id + ':' + g.id ? 'sel' : ''}"
+                  style="flex:${b.share} 1 0%; background-color:${PALETTE[i % PALETTE.length]}"
+                  onclick="pick(${u.id}, ${g.id})" title="${esc(g.serviceName)}: ${esc(b.status)}">
+            <span class="t"><span class="s">${esc(g.serviceName)}</span><span class="a">${money(b.share)}</span></span>
+            <span class="mark">${MARK[b.status]}</span>
+          </button>`).join('');
+
+        // the bigger portion for whichever segment is open
+        let detail = '';
+        const open = mine.find(m => selected === u.id + ':' + m.g.id);
+        if (open) {
+          const { g, b, i } = open;
+          const host = users.find(x => x.id === g.ownerId);
+          const pct = g.totalCost > 0 ? Math.round(b.share / g.totalCost * 100) : 0;
+          const paidPct = b.share > 0 ? Math.min(100, b.paid / b.share * 100) : 100;
+          const shareSum = lists[i].reduce((sum, x) => sum + x.share, 0);
+          const mismatch = g.split === 'CUSTOM' && Math.abs(shareSum - g.totalCost) > 0.005;
+          const others = lists[i].filter(x => x.userId !== u.id)
+            .map(x => `${esc(x.userName)} <span class="badge ${x.status}">${x.status}</span>`).join(' ');
+          const renews = g.endsOn ? `Ends ${esc(g.endsOn)} (cancelled)` : esc(g.nextRenewal);
+          detail = `
+            <div class="detail" style="border-color:${PALETTE[i % PALETTE.length]}">
+              <div class="d-head">
+                <h3>${esc(g.serviceName)}</h3>
+                <span class="badge ${b.status}">${b.status}</span>
+                <button class="x" onclick="pick(${u.id}, ${g.id})" aria-label="Close">×</button>
+              </div>
+              <div class="grid">
+                <div><span>Total cost</span><b>${money(g.totalCost)}</b></div>
+                <div><span>${esc(u.name)}'s share</span><b>${money(b.share)} (${pct}%)</b></div>
+                <div><span>Paid this cycle</span><b>${money(b.paid)}</b></div>
+                <div><span>Still owes</span><b>${money(b.owed)}</b></div>
+                <div><span>Split</span><b>${g.split === 'EVEN' ? 'Even' : 'Custom'}</b></div>
+                <div><span>${g.endsOn ? 'Status' : 'Next renewal'}</span><b>${renews}</b></div>
+                <div><span>Cycle started</span><b>${esc(g.cycleStart)}</b></div>
+                <div><span>Hosted by</span><b>${host ? esc(host.name) : '?'}</b></div>
+              </div>
+              <div class="progress"><div style="width:${paidPct}%"></div></div>
+              ${mismatch ? `<div class="warn">Shares add up to ${money(shareSum)}, but the subscription costs ${money(g.totalCost)}.</div>` : ''}
+              <div class="others">Also splitting: ${others || 'no one else yet'}</div>
+              ${u.id === me.id && b.owed > 0 ? `<button class="payBtn" onclick="payNow(${g.id}, ${b.owed})">I've paid ${money(b.owed)}</button>` : ''}
+            </div>`;
+        }
+
+        html += `
+          <div class="person">
+            <div class="avatar" style="background:hsl(${hue(u.name)}, 60%, 80%)">${esc(u.name.trim().charAt(0).toUpperCase())}</div>
+            <div class="right">
+              <div class="name">${esc(u.name)}${u.id === me.id ? ' (you)' : ''}<span class="total">${mine.length ? money(total) + ' / month' : ''}</span></div>
+              ${mine.length ? `<div class="bar">${segs}</div>` : '<div class="bar empty">Not in any subscription yet</div>'}
+              ${detail}
+            </div>
+          </div>`;
+      }
+      document.getElementById('people').innerHTML = html;
+    }
+
+    boot().catch(show);
+</script>
+</body>
+</html>
