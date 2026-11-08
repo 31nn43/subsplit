@@ -109,16 +109,17 @@
         </svg>
         <span>Subsplit</span>
     </div>
-    <div class="menu-wrap hidden" id="menuWrap">
+    <div class="menu-wrap" id="menuWrap">
         <button id="menuBtn" onclick="toggleMenu(event)" aria-label="Menu">☰</button>
         <div id="menu" class="menu hidden">
-            <button disabled id="who"></button>
+            <button disabled id="who">Not signed in</button>
             <hr>
-            <button onclick="openManage()">Manage subscriptions</button>
+            <div data-auth="in" class="hidden"><button onclick="openManage()">Manage subscriptions</button></div>
             <button disabled>Settings (coming soon)</button>
             <button disabled>History (coming soon)</button>
             <hr>
-            <button onclick="logout()">Log out</button>
+            <div data-auth="in" class="hidden"><button onclick="logout()">Log out</button></div>
+            <div data-auth="out"><button onclick="goLogin()">Log in / Sign up</button></div>
         </div>
     </div>
 </header>
@@ -225,16 +226,25 @@
         if (err.status === 401) { me = null; showAuth(); return; }
         throw err;
       }
-      setHidden('auth', true); setHidden('app', false); setHidden('menuWrap', false);
-      document.getElementById('who').textContent = 'Signed in as ' + me.name;
+      setHidden('auth', true); setHidden('app', false); setMenuMode(true);
       await load();
       if (!cache.groups.some(g => !g.ended)) openManage();   // nothing yet: start by creating a subscription
     }
 
     function showAuth() {
-      setHidden('auth', false); setHidden('app', true); setHidden('menuWrap', true);
+      setHidden('auth', false); setHidden('app', true); setMenuMode(false);
       closeManage();
     }
+
+   // the menu is always visible; this swaps which items it shows
+   function setMenuMode(loggedIn) {
+     document.querySelectorAll('[data-auth]').forEach(el =>
+       el.classList.toggle('hidden', (el.dataset.auth === 'in') !== loggedIn));
+     document.getElementById('who').textContent = loggedIn ? 'Signed in as ' + me.name : 'Not signed in';
+   }
+
+   // "Log in / Sign up" in the menu: jump to whichever form is showing
+   function goLogin() { document.querySelector('#auth form:not(.hidden) input').focus(); }
 
     let signingUp = false;
     function toggleAuth() {
