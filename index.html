@@ -114,7 +114,10 @@
         <div id="menu" class="menu hidden">
             <button disabled id="who">Not signed in</button>
             <hr>
-            <div data-auth="in" class="hidden"><button onclick="openManage()">Manage subscriptions</button></div>
+            <div data-auth="in" class="hidden">
+                <button onclick="openCreate()">New subscription</button>
+                <button onclick="openManage()">Manage subscriptions</button>
+            </div>
             <button disabled>Settings (coming soon)</button>
             <button disabled>History (coming soon)</button>
             <hr>
@@ -152,14 +155,13 @@
         <div id="people"></div>
     </div>
 
-    <div id="manage" class="modal hidden" onclick="if (event.target === this) closeManage()">
+    <!-- popup 1: create a subscription (it has to exist before anyone can be added to it) -->
+    <div id="create" class="modal hidden" onclick="if (event.target === this) closeCreate()">
         <div class="modal-box">
             <div class="modal-head">
-                <h2>Manage subscriptions</h2>
-                <button class="x" onclick="closeManage()" aria-label="Close">×</button>
+                <h2>New shared subscription</h2>
+                <button class="x" onclick="closeCreate()" aria-label="Close">×</button>
             </div>
-
-            <h3>New shared subscription</h3>
             <form onsubmit="addGroup(event)">
                 <input name="serviceName" placeholder="Service (e.g. Crunchyroll)" required>
                 <input name="totalCost" type="number" step="0.01" min="0.01" placeholder="Total cost / month" required>
@@ -172,32 +174,51 @@
                 </label>
                 <button>Create</button>
             </form>
-            <div class="meta">It renews automatically every month on that day until you cancel it. You're the owner of subscriptions you create.</div>
+            <div class="meta">It renews automatically every month on that day until you cancel it. Next you'll add the people who share it.</div>
+        </div>
+    </div>
 
-            <h3>Add someone to a subscription</h3>
-            <form onsubmit="addMember(event)">
-                <select name="groupId" id="memberGroup" class="mine" onchange="syncForms()" required></select>
-                <input name="who"  placeholder="Their name or email (they must have signed up)" required>
-                <input name="share" id="shareInput" type="number" step="0.01" min="0" placeholder="Their share">
-                <button>Add</button>
-            </form>
-            <div class="meta" id="shareNote"></div>
+    <!-- popup 2: everything you do with a subscription that already exists -->
+    <div id="manage" class="modal hidden" onclick="if (event.target === this) closeManage()">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Manage subscriptions</h2>
+                <button class="x" onclick="closeManage()" aria-label="Close">×</button>
+            </div>
 
-            <h3>Record a payment</h3>
-            <form onsubmit="addPayment(event)">
-                <select name="groupId" id="payGroup" class="all" onchange="syncForms()" required></select>
-                <select name="userId" id="payer" class="hidden" disabled></select>
-                <input name="amount" type="number" step="0.01" min="0.01" placeholder="Amount paid" required>
-                <button>Record</button>
-            </form>
-            <div class="meta">You record your own payments. Owners can also record one for someone else.</div>
+            <p class="meta hidden" id="noSubs">You're not part of any subscription yet. Open the ☰ menu and choose "New subscription", then come back here to add people.</p>
+            <p class="meta hidden" id="noOwn">The subscriptions you're in were created by someone else. You can record your payments here, but only the owner can add people or cancel.</p>
 
-            <h3>Cancel a subscription</h3>
-            <form onsubmit="cancelGroup(event)">
-                <select name="groupId" class="mine" required></select>
-                <button class="danger">Stop renewing</button>
-            </form>
-            <div class="meta">It keeps running until the end of the current month's cycle, then stops.</div>
+            <div id="secAdd">
+                <h3>Add someone to a subscription</h3>
+                <form onsubmit="addMember(event)">
+                    <select name="groupId" id="memberGroup" class="mine" onchange="syncForms()" required></select>
+                    <input name="who" placeholder="Their name or email (they must have signed up)" required>
+                    <input name="share" id="shareInput" type="number" step="0.01" min="0" placeholder="Their share">
+                    <button>Add</button>
+                </form>
+                <div class="meta" id="shareNote"></div>
+            </div>
+
+            <div id="secPay">
+                <h3>Record a payment</h3>
+                <form onsubmit="addPayment(event)">
+                    <select name="groupId" id="payGroup" class="all" onchange="syncForms()" required></select>
+                    <select name="userId" id="payer" class="hidden" disabled></select>
+                    <input name="amount" type="number" step="0.01" min="0.01" placeholder="Amount paid" required>
+                    <button>Record</button>
+                </form>
+                <div class="meta">You record your own payments. Owners can also record one for someone else.</div>
+            </div>
+
+            <div id="secCancel">
+                <h3>Cancel a subscription</h3>
+                <form onsubmit="cancelGroup(event)">
+                    <select name="groupId" class="mine" required></select>
+                    <button class="danger">Stop renewing</button>
+                </form>
+                <div class="meta">It keeps running until the end of the current month's cycle, then stops.</div>
+            </div>
         </div>
     </div>
 </main>
@@ -228,7 +249,7 @@
       }
       setHidden('auth', true); setHidden('app', false); setMenuMode(true);
       await load();
-      if (!cache.groups.some(g => !g.ended)) openManage();   // nothing yet: start by creating a subscription
+      if (!cache.groups.some(g => !g.ended)) openCreate();   // nothing yet: start by creating a subscription
     }
 
     function showAuth() {
@@ -281,7 +302,18 @@
         await load();
       } catch (err) { show(err); }
     }
-    const addGroup   = e => submitTo(e, () => 'groups');
+    // creating a subscription leads straight into adding people to it
+    async function addGroup(e) {
+      e.preventDefault();
+      try {
+        const form = e.target;
+        const g = await api('groups', new FormData(form));
+        form.reset(); show(null);
+        await load();
+        closeCreate();
+        openManage(g.id);
+      } catch (err) { show(err); }
+    }
     const addMember  = e => submitTo(e, fd => `groups/${fd.get('groupId')}/members`);
     const addPayment = e => submitTo(e, fd => `groups/${fd.get('groupId')}/payments`);
     async function cancelGroup(e) {
@@ -297,11 +329,19 @@
     }
 
     // ---------- menu + manage popup ----------
-    function toggleMenu(e) { e.stopPropagation(); document.getElementById('menu').classList.toggle('hidden'); }
-    document.addEventListener('click', () => document.getElementById('menu').classList.add('hidden'));
-    function openManage() { document.getElementById('manage').classList.remove('hidden'); }
+    function openCreate() { document.getElementById('create').classList.remove('hidden'); }
+    function closeCreate() { document.getElementById('create').classList.add('hidden'); }
+    // groupId (optional): preselect that subscription in "Add someone" and jump to the name box
+    function openManage(groupId) {
+      document.getElementById('manage').classList.remove('hidden');
+      if (groupId) {
+        document.getElementById('memberGroup').value = String(groupId);
+        syncForms();
+        document.querySelector('#manage input[name=who]').focus();
+      }
+    }
     function closeManage() { document.getElementById('manage').classList.add('hidden'); }
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeManage(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeManage(); closeCreate(); } });
 
     // ---------- drawing ----------
     const PALETTE = ['#FF8A5B', '#FFB86B', '#E5634D', '#F4D58D', '#E58F8F', '#8FBF9F', '#C9A27E', '#F29E6F'];
